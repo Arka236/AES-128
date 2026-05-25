@@ -1,16 +1,17 @@
-# 🚀 High-Speed AES-128 Hardware Accelerator 
+# 🚀 High-Speed AES-128 Cryptographic IP Core (AXI4-Lite)
 
-![Verilog](https://img.shields.io/badge/Language-Verilog_HDL-blue.svg)
-![Verification](https://img.shields.io/badge/Verification-Automated_RTL_Testbench-blue.svg)
+![RTL Design](https://img.shields.io/badge/Design-Verilog_HDL-blue.svg)
+![Verification](https://img.shields.io/badge/Verification-Automated_Testbench-purple.svg)
+![Interface](https://img.shields.io/badge/Interface-AXI4--Lite-orange.svg)
 ![Standard](https://img.shields.io/badge/Standard-FIPS--197_Compliant-success.svg)
 
 ## 📌 Project Overview
-This project implements a fully unrolled, 10-stage pipelined **AES-128 Cryptographic Accelerator** mapped to the Xilinx Zynq-7000 Programmable Logic (PL). To facilitate controlled data transfer, the hardware core is wrapped in a custom **AXI4-Lite Slave Memory interface**.
+This project implements a fully unrolled, 10-stage pipelined **AES-128 Cryptographic IP Core** designed entirely in Verilog HDL. To ensure seamless integration into modern System-on-Chip (SoC) architectures, the cryptographic engine is wrapped in a custom, dual-ported **AXI4-Lite Slave Memory interface**.
 
-By leveraging a pure hardware architecture, the system achieves massive mathematical throughput for standard ECB encryption in silicon. The accompanying automated Verilog AXI-Master testbench acts as the system controller, dynamically executing advanced stream cipher modes (CBC and CTR) by driving the AXI interface, proving the hardware's versatility without altering the underlying FIPS-compliant pipeline.
+By leveraging a pure hardware architecture, the system achieves massive mathematical throughput for standard ECB encryption in silicon. The accompanying automated Verilog AXI-Master testbench acts as the system controller, dynamically executing advanced stream cipher modes (CBC and CTR) by driving the AXI interface, proving the IP's versatility without altering the underlying FIPS-compliant pipeline.
 
-## ⚡ Performance Metrics & The I/O Bottleneck
-The mathematical core was heavily optimized for single-cycle resolution per round (including Galois Field matrix multiplication for MixColumns), yielding exceptional static timing results. However, system-level architecture dictates a clear distinction between internal processing power and interface limitations:
+## ⚡ Synthesis Metrics & The I/O Bottleneck
+The mathematical core was heavily optimized for single-cycle resolution per round (including Galois Field matrix multiplication for MixColumns), yielding exceptional static timing results during synthesis targeting a generic 100 MHz clock. However, system-level architecture dictates a clear distinction between internal processing power and interface limitations:
 
 * **Target Clock:** 10.0 ns (100 MHz)
 * **Achieved WNS (Worst Negative Slack):** +5.8 ns
@@ -18,22 +19,22 @@ The mathematical core was heavily optimized for single-cycle resolution per roun
 * **Pipeline Latency:** 11 Clock Cycles
 
 ### Throughput Analysis
-* **Peak Internal Core Throughput: 30.4 Gbps** *(Calculated via the 128-bit internal hardware datapath processing one block per clock cycle at 238 MHz).*
+* **Peak Internal Engine Throughput: 30.4 Gbps** *(Calculated via the 128-bit internal hardware datapath processing one block per clock cycle at 238 MHz internal saturation).*
 * **Theoretical Interface Throughput: 7.6 Gbps** *(Calculated via the 32-bit AXI4-Lite external bus limit: 32 bits × 238 MHz).*
 * **Real-World System Bottleneck:** Because AXI4-Lite requires a multi-cycle handshaking protocol for every 32-bit read/write transaction, the true system-level throughput is heavily bound by the AXI Master's transmission speed. The cryptographic engine is vastly faster than its I/O interface, a classic SoC architectural constraint.
 
 ## 🧠 System Architecture
 
-### 1. The Hardware Core (Programmable Logic)
-* **Unrolled Pipeline:** Abandoned traditional iterative state machines in favor of 10 physically cascaded round blocks to maximize raw silicon speed. 
-* **Custom Memory-Mapped Registers (MMR):** Designed a 64-byte dual-ported AXI4-Lite memory map to decouple the external 32-bit bus limit from the engine's 128-bit internal datapath.
-* **Hardware Lockout Mechanism:** Implemented a strict Busy/Idle state machine. The AXI write channels for the Key and Plaintext registers are physically locked out at the silicon level while the `Busy` flag is high, preventing data corruption during execution.
+### 1. The RTL IP Core (Datapath & Control)
+* **Unrolled Pipeline:** Abandoned traditional iterative state machines in favor of 10 physically cascaded round blocks to maximize raw silicon speed and allow continuous data streaming. 
+* **Custom Memory-Mapped Registers (MMR):** Designed a 64-byte AXI4-Lite memory map to decouple the external 32-bit SoC bus limit from the engine's 128-bit internal datapath.
+* **Hardware Lockout Mechanism:** Implemented a strict Busy/Idle state machine. The AXI write channels for the Key and Plaintext registers are physically locked out at the RTL level while the `Busy` flag is high, preventing data corruption during execution.
 
-### 2. The System Controller (AXI Master Testbench)
-* **Automated RTL Control:** A custom Verilog testbench simulates a pure AXI Master, utilizing specific read/write tasks to program the FIPS Key, load the Plaintext, and trigger the hardware engine.
-* **Modes of Operation:** * **ECB (Electronic Codebook):** Natively executed in hardware for baseline FIPS verification.
-  * **CBC (Cipher Block Chaining):** Testbench-driven XOR chaining utilizing the hardware as a coprocessor.
-  * **CTR (Counter Mode):** Stream cipher implementation where the hardware encrypts a Nonce+Counter, completely masking data patterns while retaining high parallel throughput.
+### 2. Design Verification (AXI Master Testbench)
+* **Automated RTL Control:** A custom Verilog testbench simulates a generic SoC AXI Master, utilizing specific read/write tasks to program the FIPS Key, load the Plaintext, and trigger the hardware engine via the memory map.
+* **Modes of Operation Verification:** * **ECB (Electronic Codebook):** Natively executed in hardware for baseline FIPS verification.
+  * **CBC (Cipher Block Chaining):** Testbench-driven XOR chaining utilizing the RTL core as a coprocessor.
+  * **CTR (Counter Mode):** Stream cipher implementation where the testbench encrypts a Nonce+Counter, completely masking data patterns while retaining high parallel throughput.
 
 ## 🗄️ Custom AXI4-Lite Register Map
 
@@ -45,22 +46,22 @@ The mathematical core was heavily optimized for single-cycle resolution per roun
 | `0x20 - 0x2C` | **Plaintext [0:3]**| W | 128-bit Data Input (Locked when Busy) |
 | `0x30 - 0x3C` | **Ciphertext [0:3]**| R | 128-bit Encrypted Output |
 
-## 🧪 Verification & Security Testing
+## 🧪 Security Testing & Verification
 The hardware was rigorously tested against **FIPS-197 Standard Vectors**. 
 
-Furthermore, the design's cryptographic diffusion was verified by triggering the **Avalanche Effect**. Modifying a single bit of the input plaintext results in a complete scrambling of the 128-bit ciphertext by Round 3, proving the mathematical integrity of the SubBytes (S-Box) and MixColumns stages. All Advanced Modes (CBC/CTR) were verified via a custom automated Verilog testbench suite.
+Furthermore, the design's cryptographic diffusion was visually verified by triggering the **Avalanche Effect** in simulation. Modifying a single bit of the input plaintext results in a complete scrambling of the 128-bit ciphertext by Round 3, proving the mathematical integrity of the SubBytes (S-Box) and MixColumns stages. All Advanced Modes (CBC/CTR) were exhaustively verified via the automated behavioral simulation suite.
 
 ## 🛠️ Tools Used
-* **EDA Tool:** Xilinx Vivado 2018.3 (Synthesis, Implementation, Simulation)
+* **EDA Tool:** Xilinx Vivado 2018.3 (Synthesis & Behavioral Simulation)
 * **Language:** Verilog-2001
-* **Target Hardware:** Designed for Xilinx Zynq-7000 SoC architecture
 
-## 🚀 How to Run the Project
+## 🚀 How to Run the Behavioral Simulation
 1. Clone this repository.
-2. Open Vivado and add the RTL files to your project hierarchy.
-3. Set `tb_aes_axi_lite.v` as the top module for simulation.
-4. Run the behavioral simulation.
-5. In the TCL Console, observe the automated execution and verification of the FIPS-197 ECB baseline, followed by the CBC and CTR advanced mode tests.
+2. Open Xilinx Vivado and create a new RTL project.
+3. Add the Verilog files to your project hierarchy.
+4. Set `tb_aes_axi_lite.v` as the top module for simulation.
+5. Launch the Behavioral Simulation.
+6. In the TCL Console, observe the automated execution and verification of the FIPS-197 ECB baseline, followed by the CBC and CTR advanced mode tests. Expand the wave viewer to observe the AXI handshaking.
 
 ---
 
@@ -70,9 +71,9 @@ In modern integrated sensing and communication systems, data security is mandato
 Software execution requires thousands of clock cycles to encrypt a single 16-byte block of data. This creates a massive data bottleneck, consumes excessive CPU overhead, and drains power. The problem is how to secure high-speed data streams without crippling the main processor's performance.
 
 ## 2. The Project Aim
-The objective of this project was to offload the heavy mathematical workload of encryption into custom silicon. 
+The objective of this project was to offload the heavy mathematical workload of encryption into a dedicated hardware IP block. 
 
-Specifically, the aim was to design, verify, and implement a **FIPS-197 compliant AES-128 hardware accelerator** from scratch strictly using Verilog HDL. This custom IP core had to be successfully integrated into the Xilinx Zynq-7000 SoC architecture using a strict **AXI4-Lite Slave Memory interface**, allowing an AXI Master to easily write data, trigger the hardware, and read back the secured ciphertext.
+Specifically, the aim was to design, verify, and implement a **FIPS-197 compliant AES-128 hardware accelerator** from scratch strictly using Verilog HDL. This custom IP core had to be easily integrated into modern SoC architectures using a strict **AXI4-Lite Slave Memory interface**, allowing an AXI Master to write data, trigger the hardware, and read back the secured ciphertext with minimal overhead.
 
 ---
 
@@ -99,7 +100,7 @@ These modules assemble the primitive math blocks into a functioning engine.
     * It manages the 11-cycle latency state machine, capturing the ciphertext and raising a `Done` flag when finished.
 
 ### D. The Verification Suite
-* **`tb_aes_axi_lite.v`:** The final verification testbench. Because the design uses AXI4-Lite, this testbench acts as a simulated AXI Master. It writes the FIPS-197 standard vectors into the memory map via AXI transactions. Furthermore, it contains custom Verilog tasks to emulate advanced streaming modes like **CBC (Cipher Block Chaining)** and **CTR (Counter Mode)**, proving the hardware can support advanced security protocols entirely within the simulation environment.
+* **`tb_aes_axi_lite.v`:** The final verification testbench. Because the design uses AXI4-Lite, this testbench acts as a simulated AXI Master. It writes the FIPS-197 standard vectors into the memory map via AXI transactions. Furthermore, it contains custom Verilog tasks to emulate advanced streaming modes like **CBC (Cipher Block Chaining)** and **CTR (Counter Mode)**, proving the IP core can support advanced security protocols entirely within the simulation environment.
 
 ---
 
