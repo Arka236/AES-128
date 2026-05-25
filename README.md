@@ -3,7 +3,6 @@
 # 🚀 High-Speed AES-128 Hardware Accelerator on Zynq-7000 SoC
 
 ![Verilog](https://img.shields.io/badge/Language-Verilog_HDL-blue.svg)
-
 ![Standard](https://img.shields.io/badge/Standard-FIPS--197_Compliant-success.svg)
 
 ## 📌 Project Overview
